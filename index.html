@@ -3,168 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IT Support Live Chat & Voice Call</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
+    <title>IT Support - Chat & Voice Call</title>
+    
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Supabase JS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Custom CSS -->
+    
+    <!-- CSS Terpisah -->
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Supabase SDK dari CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navbar -->
+        <!-- Sidebar Menu -->
         <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon"><i class="fa-solid fa-headset"></i></div>
-                <div class="brand-text">
-                    <h2>IT Helpdesk</h2>
-                    <span class="status-badge"><i class="fa-solid fa-circle text-online"></i> Live Supabase</span>
-                </div>
+            <div class="logo-area">
+                <i class="fas fa-headset"></i>
+                <h2>IT Support Portal</h2>
             </div>
-
-            <!-- Role Selector Widget -->
-            <div class="role-card">
-                <label class="role-label"><i class="fa-solid fa-user-gear"></i> Mode Peran Anda:</label>
-                <div class="role-toggle">
-                    <button id="btnRoleUser" class="role-btn active" onclick="switchRole('user')">
-                        <i class="fa-solid fa-user"></i> User
-                    </button>
-                    <button id="btnRoleIT" class="role-btn" onclick="switchRole('it_support')">
-                        <i class="fa-solid fa-shield-halved"></i> IT Support
-                    </button>
-                </div>
-                <div class="role-info" id="roleInfoText">
-                    Anda bertindak sebagai <strong>End-User</strong> meminta bantuan teknis.
-                </div>
+            
+            <div class="role-selector">
+                <label for="roleSelect">Masuk Sebagai:</label>
+                <select id="roleSelect">
+                    <option value="user">User Umum</option>
+                    <option value="it">IT Support</option>
+                </select>
             </div>
-
-            <!-- Active Users / Info Panel -->
-            <div class="sidebar-section">
-                <h3><i class="fa-solid fa-server"></i> Supabase Status</h3>
-                <div class="connection-status" id="connStatus">
-                    <i class="fa-solid fa-wifi text-success"></i> Terhubung Realtime
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <h3><i class="fa-solid fa-database"></i> Database SQL Setup</h3>
-                <button class="btn-sql" onclick="toggleSqlModal()">
-                    <i class="fa-solid fa-code"></i> Lihat SQL Schema
-                </button>
-            </div>
-
-            <div class="sidebar-footer">
-                <p>IT Desk Hub &copy; 2026</p>
-                <small>WebRTC + Supabase Realtime</small>
+            
+            <div class="status-indicator">
+                <span id="dbStatus" class="status-dot disconnected"></span>
+                <span id="dbStatusText">Menghubungkan ke Supabase...</span>
             </div>
         </aside>
 
-        <!-- Main Workspace / Chat Panel -->
-        <main class="chat-workspace">
-            <!-- Chat Header -->
+        <!-- Area Chat Utama -->
+        <main class="chat-area">
             <header class="chat-header">
-                <div class="target-profile">
-                    <div class="avatar" id="targetAvatar">
-                        <i class="fa-solid fa-user-shield"></i>
-                    </div>
-                    <div class="target-info">
-                        <h3 id="targetTitle">IT Specialist Support</h3>
-                        <p id="targetSubtitle"><span class="pulse-dot"></span> Siap melayani kendala sistem</p>
-                    </div>
+                <div class="header-info">
+                    <h3 id="chatHeaderTitle">Chat dengan IT Support</h3>
+                    <p class="subtitle">Real-time chat & Voice Call</p>
                 </div>
-
-                <div class="header-actions">
-                    <button class="btn-call-voice" id="btnStartCall" onclick="initiateVoiceCall()">
-                        <i class="fa-solid fa-phone"></i> Panggil Suara
-                    </button>
-                </div>
+                <button id="callBtn" class="call-btn" title="Mulai Panggilan Suara">
+                    <i class="fas fa-phone-alt"></i>
+                </button>
             </header>
 
-            <!-- Chat Messages Log -->
-            <div class="chat-messages" id="chatMessages">
-                <div class="system-message">
-                    <i class="fa-solid fa-lock"></i> Sesi terhubung aman ke Supabase Cloud (`ojlpeqhstbsuzjqccjgk`)
-                </div>
+            <div class="messages-container" id="messagesContainer">
+                <!-- Pesan akan muncul di sini -->
             </div>
 
-            <!-- Chat Input Bar -->
-            <footer class="chat-input-container">
-                <form id="chatForm" onsubmit="handleSendMessage(event)">
-                    <div class="input-wrapper">
-                        <input type="text" id="messageInput" placeholder="Ketik pesan kendala IT di sini..." autocomplete="off">
-                        <button type="submit" class="btn-send" id="btnSend">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            </footer>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="Ketik pesan Anda di sini..." autocomplete="off">
+                <button id="sendBtn" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </main>
     </div>
 
-    <!-- Floating Voice Call Overlay Modal -->
-    <div class="call-overlay" id="callOverlay">
-        <div class="call-card">
-            <div class="call-avatar-container">
-                <div class="call-avatar" id="callAvatarIcon">
-                    <i class="fa-solid fa-user-headset"></i>
-                </div>
-                <div class="sound-wave" id="soundWave">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
+    <!-- Modal Panggilan Suara -->
+    <div class="modal-overlay" id="callModal">
+        <div class="call-box">
+            <div class="caller-avatar">
+                <i class="fas fa-user-circle"></i>
             </div>
-            <h3 id="callPeerName">IT Specialist Support</h3>
-            <p id="callStatusText" class="call-status">Memanggil...</p>
-            <div class="call-timer" id="callTimer">00:00</div>
-
-            <!-- Call Control Buttons -->
-            <div class="call-controls">
-                <button class="call-btn btn-accept" id="btnAcceptCall" onclick="acceptIncomingCall()" style="display:none;">
-                    <i class="fa-solid fa-phone-flip"></i> Terima
-                </button>
-                <button class="call-btn btn-mute" id="btnMuteCall" onclick="toggleMuteAudio()">
-                    <i class="fa-solid fa-microphone"></i>
-                </button>
-                <button class="call-btn btn-hangup" onclick="endVoiceCall()">
-                    <i class="fa-solid fa-phone-slash"></i>
-                </button>
+            <h3 id="callStatusText">Panggilan Masuk...</h3>
+            <p id="callRoleText">Dari: IT Support</p>
+            
+            <div class="call-actions">
+                <button id="acceptCallBtn" class="action-btn accept"><i class="fas fa-phone"></i> Terima</button>
+                <button id="rejectCallBtn" class="action-btn reject"><i class="fas fa-phone-slash"></i> Tolak/Tutup</button>
             </div>
         </div>
     </div>
 
-    <!-- SQL Setup Modal -->
-    <div class="modal-overlay" id="sqlModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-database"></i> Supabase SQL Schema setup</h3>
-                <button class="close-btn" onclick="toggleSqlModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Jalankan query ini di <strong>SQL Editor</strong> Dashboard Supabase Anda jika tabel `chat_messages` belum dibuat:</p>
-                <pre><code id="sqlCode">CREATE TABLE IF NOT EXISTS public.chat_messages (
-    id BIGSERIAL PRIMARY KEY,
-    sender_role VARCHAR(20) NOT NULL,
-    sender_name VARCHAR(100) NOT NULL,
-    message TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+    <!-- Elemen Audio Tersembunyi untuk WebRTC -->
+    <audio id="remoteAudio" autoplay hidden></audio>
 
--- Buka akses Realtime & RLS
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public access" ON public.chat_messages FOR ALL USING (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;</code></pre>
-                <button class="btn-copy" onclick="copySql()"><i class="fa-solid fa-copy"></i> Salin Kode SQL</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Hidden Audio Element for WebRTC Stream -->
-    <audio id="remoteAudio" autoplay></audio>
-
+    <!-- JavaScript Terpisah -->
     <script src="app.js"></script>
 </body>
 </html>

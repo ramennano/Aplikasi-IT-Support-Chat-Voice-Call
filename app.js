@@ -1,383 +1,271 @@
-/**
- * IT Support Chat & Voice Calling Application
- * Connected to Supabase Cloud
- */
-
-// Supabase Credentials
+// Konfigurasi Supabase Hardcoded
 const SUPABASE_URL = 'https://ojlpeqhstbsuzjqccjgk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qbHBlcWhzdGJzdXpqcWNjamdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNjExNTcsImV4cCI6MjEwNTczNzE1N30.hMoVGhKUBUlcktrWhsBaOk5A673irsAsYn_iMdOJKjw';
 
-// Initialize Supabase Client
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Application State
-let currentRole = 'user'; // 'user' or 'it_support'
-let localStream = null;
-let peerConnection = null;
-let realtimeChannel = null;
-let callTimerInterval = null;
-let callSeconds = 0;
-let isAudioMuted = false;
-let audioCtx = null;
-let ringtoneOscillator = null;
-
-// STUN Server Configuration for WebRTC
-const rtcConfig = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+// State Aplikasi
+const state = {
+    role: 'user', // 'user' atau 'it'
+    clientId: Math.random().toString(36).substring(2, 15),
+    peerConnection: null,
+    localStream: null,
+    isCallActive: false
 };
 
-// DOM Content Loaded Handler
-document.addEventListener('DOMContentLoaded', () => {
-    initRealtimeConnection();
-    loadChatHistory();
+// Konfigurasi WebRTC (Menggunakan server Google STUN gratis)
+const rtcConfig = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
+// Elemen DOM
+const dom = {
+    roleSelect: document.getElementById('roleSelect'),
+    dbStatus: document.getElementById('dbStatus'),
+    dbStatusText: document.getElementById('dbStatusText'),
+    chatHeaderTitle: document.getElementById('chatHeaderTitle'),
+    messagesContainer: document.getElementById('messagesContainer'),
+    messageInput: document.getElementById('messageInput'),
+    sendBtn: document.getElementById('sendBtn'),
+    callBtn: document.getElementById('callBtn'),
+    callModal: document.getElementById('callModal'),
+    callStatusText: document.getElementById('callStatusText'),
+    callRoleText: document.getElementById('callRoleText'),
+    acceptCallBtn: document.getElementById('acceptCallBtn'),
+    rejectCallBtn: document.getElementById('rejectCallBtn'),
+    remoteAudio: document.getElementById('remoteAudio')
+};
+
+// Inisialisasi Realtime Channel
+const channel = supabase.channel('support-room', {
+    config: { broadcast: { self: false } }
 });
 
-// Role Switcher Handler
-function switchRole(role) {
-    currentRole = role;
-    document.getElementById('btnRoleUser').classList.toggle('active', role === 'user');
-    document.getElementById('btnRoleIT').classList.toggle('active', role === 'it_support');
+// Setup Realtime Listeners
+channel
+    .on('broadcast', { event: 'chat' }, (payload) => renderMessage(payload.payload))
+    .on('broadcast', { event: 'call-offer' }, handleCallOffer)
+    .on('broadcast', { event: 'call-answer' }, handleCallAnswer)
+    .on('broadcast', { event: 'ice-candidate' }, handleIceCandidate)
+    .on('broadcast', { event: 'call-ended' }, endCall)
+    .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            dom.dbStatus.classList.replace('disconnected', 'connected');
+            dom.dbStatusText.textContent = 'Terhubung ke Server';
+            loadChatHistory();
+        } else {
+            dom.dbStatus.classList.replace('connected', 'disconnected');
+            dom.dbStatusText.textContent = 'Terputus (Menghubungkan ulang...)';
+        }
+    });
 
-    const targetTitle = document.getElementById('targetTitle');
-    const targetAvatar = document.getElementById('targetAvatar');
-    const roleInfo = document.getElementById('roleInfoText');
+// Event Listeners DOM
+dom.roleSelect.addEventListener('change', (e) => {
+    state.role = e.target.value;
+    dom.chatHeaderTitle.textContent = state.role === 'user' ? 'Chat dengan IT Support' : 'Chat dengan User';
+});
 
-    if (role === 'user') {
-        targetTitle.innerText = "IT Specialist Support";
-        targetAvatar.innerHTML = '<i class="fa-solid fa-user-shield"></i>';
-        roleInfo.innerHTML = 'Anda bertindak sebagai <strong>End-User</strong> meminta bantuan teknis.';
-    } else {
-        targetTitle.innerText = "User Client (Tiket #1042)";
-        targetAvatar.innerHTML = '<i class="fa-solid fa-user"></i>';
-        roleInfo.innerHTML = 'Anda bertindak sebagai <strong>IT Support</strong> melayani panggilan & pesan user.';
+dom.sendBtn.addEventListener('click', sendMessage);
+dom.messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
+dom.callBtn.addEventListener('click', startCall);
+dom.rejectCallBtn.addEventListener('click', endCall);
+dom.acceptCallBtn.addEventListener('click', acceptCall);
+
+// --- LOGIKA CHAT ---
+
+async function sendMessage() {
+    const text = dom.messageInput.value.trim();
+    if (!text) return;
+
+    const msgData = {
+        id: Date.now(),
+        clientId: state.clientId,
+        role: state.role,
+        message: text,
+        created_at: new Date().toISOString()
+    };
+
+    // Tampilkan di layar sendiri
+    renderMessage(msgData);
+    dom.messageInput.value = '';
+
+    // Broadcast Realtime ke lawan bicara
+    channel.send({ type: 'broadcast', event: 'chat', payload: msgData });
+
+    // Simpan ke database Supabase (Pastikan sudah buat tabel 'chat_messages' di Supabase)
+    try {
+        await supabase.from('chat_messages').insert([{
+            sender_role: msgData.role,
+            message: msgData.message
+        }]);
+    } catch (e) {
+        console.warn("Gagal menyimpan ke database (pastikan tabel sudah dibuat):", e);
     }
 }
 
-// Supabase Realtime Setup
-function initRealtimeConnection() {
-    realtimeChannel = supabaseClient.channel('it-support-room', {
-        config: { broadcast: { self: false } }
-    });
-
-    // Listen for Realtime Broadcast Messages (Chat & Voice Signal)
-    realtimeChannel
-        .on('broadcast', { event: 'chat-message' }, payload => {
-            renderMessage(payload.payload, false);
-        })
-        .on('broadcast', { event: 'webrtc-signal' }, payload => {
-            handleWebRTCSignal(payload.payload);
-        })
-        .subscribe(status => {
-            const connStatus = document.getElementById('connStatus');
-            if (status === 'SUBSCRIBED') {
-                connStatus.innerHTML = '<i class="fa-solid fa-wifi text-success"></i> Terhubung Realtime';
-            } else {
-                connStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i> Memenghubungkan...';
-            }
-        });
-
-    // Listen for PostgreSQL database changes if table exists
-    supabaseClient
-        .channel('schema-db-changes')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
-            // Render only if message was sent by other role
-            if (payload.new.sender_role !== currentRole) {
-                renderMessage(payload.new, false);
-            }
-        })
-        .subscribe();
-}
-
-// Load Chat History from Supabase Database
 async function loadChatHistory() {
     try {
-        const { data, error } = await supabaseClient
+        const { data, error } = await supabase
             .from('chat_messages')
             .select('*')
             .order('created_at', { ascending: true })
             .limit(50);
 
-        if (error) {
-            console.log('PostgreSQL Table belum siap, menggunakan mode Realtime Broadcast.');
-            return;
-        }
-
-        if (data && data.length > 0) {
-            const chatLog = document.getElementById('chatMessages');
+        if (data) {
+            dom.messagesContainer.innerHTML = '';
             data.forEach(msg => {
-                const isSelf = msg.sender_role === currentRole;
-                renderMessage(msg, isSelf);
+                renderMessage({
+                    role: msg.sender_role,
+                    message: msg.message,
+                    clientId: 'db' // Mencegah format salah saat load dari DB
+                });
             });
         }
-    } catch (err) {
-        console.warn('Fallback ke broadcast channel mode:', err);
-    }
-}
-
-// Send Chat Message
-async function handleSendMessage(e) {
-    e.preventDefault();
-    const input = document.getElementById('messageInput');
-    const text = input.value.trim();
-    if (!text) return;
-
-    const senderName = currentRole === 'user' ? 'User (Anda)' : 'IT Support Specialist';
-    const msgData = {
-        sender_role: currentRole,
-        sender_name: senderName,
-        message: text,
-        created_at: new Date().toISOString()
-    };
-
-    // Render locally immediately
-    renderMessage(msgData, true);
-    input.value = '';
-
-    // 1. Broadcast to peer realtime
-    realtimeChannel.send({
-        type: 'broadcast',
-        event: 'chat-message',
-        payload: msgData
-    });
-
-    // 2. Persist in database
-    try {
-        await supabaseClient.from('chat_messages').insert([msgData]);
-    } catch (err) {
-        console.log('Database insert skipped, broadcast delivered.');
-    }
-}
-
-// Render Bubble Message to DOM
-function renderMessage(msg, isSelf) {
-    const chatLog = document.getElementById('chatMessages');
-
-    const wrapper = document.createElement('div');
-    wrapper.className = `msg-bubble-wrapper ${isSelf ? 'self' : 'other'}`;
-
-    const sender = document.createElement('div');
-    sender.className = 'msg-sender-name';
-    sender.innerText = isSelf ? 'Anda' : msg.sender_name;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'msg-bubble';
-    bubble.innerText = msg.message;
-
-    const time = document.createElement('div');
-    time.className = 'msg-time';
-    const dateObj = new Date(msg.created_at || Date.now());
-    time.innerText = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    bubble.appendChild(time);
-    wrapper.appendChild(sender);
-    wrapper.appendChild(bubble);
-
-    chatLog.appendChild(wrapper);
-    chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-// WebRTC Voice Call Logic
-async function initiateVoiceCall() {
-    openCallOverlay('Memanggil IT Specialist / User...', false);
-    startRingtone();
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setupPeerConnection();
-
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-
-        // Send Offer via Supabase Realtime Signal
-        sendSignal({ type: 'offer', offer: offer, senderRole: currentRole });
-
-    } catch (err) {
-        alert('Gagal mengakses mikrofon: ' + err.message);
-        endVoiceCall();
-    }
-}
-
-function setupPeerConnection() {
-    peerConnection = new RTCPeerConnection(rtcConfig);
-
-    peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-            sendSignal({ type: 'candidate', candidate: event.candidate, senderRole: currentRole });
-        }
-    };
-
-    peerConnection.ontrack = event => {
-        stopRingtone();
-        const remoteAudio = document.getElementById('remoteAudio');
-        remoteAudio.srcObject = event.streams[0];
-        document.getElementById('callStatusText').innerText = 'Panggilan Berlangsung';
-        startCallTimer();
-    };
-}
-
-// Handle Received Signals
-async function handleWebRTCSignal(data) {
-    if (data.senderRole === currentRole) return; // Ignore own signals
-
-    if (data.type === 'offer') {
-        startRingtone();
-        openCallOverlay(`Panggilan Masuk dari ${data.senderRole === 'user' ? 'User' : 'IT Support'}`, true);
-        window.incomingOffer = data.offer;
-
-    } else if (data.type === 'answer' && peerConnection) {
-        stopRingtone();
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-
-    } else if (data.type === 'candidate' && peerConnection) {
-        try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-            console.error('Candidate Error:', e);
-        }
-
-    } else if (data.type === 'hangup') {
-        endVoiceCall(false);
-    }
-}
-
-// Accept Incoming Call
-async function acceptIncomingCall() {
-    stopRingtone();
-    document.getElementById('btnAcceptCall').style.display = 'none';
-    document.getElementById('callStatusText').innerText = 'Menghubungkan Suara...';
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setupPeerConnection();
-
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(window.incomingOffer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-
-        sendSignal({ type: 'answer', answer: answer, senderRole: currentRole });
-
-    } catch (err) {
-        alert('Gagal menerima panggilan: ' + err.message);
-        endVoiceCall();
-    }
-}
-
-// Helper: Send WebRTC Signal via Supabase
-function sendSignal(signalData) {
-    if (realtimeChannel) {
-        realtimeChannel.send({
-            type: 'broadcast',
-            event: 'webrtc-signal',
-            payload: signalData
-        });
-    }
-}
-
-// End or Reject Voice Call
-function endVoiceCall(notifyPeer = true) {
-    stopRingtone();
-    if (notifyPeer) {
-        sendSignal({ type: 'hangup', senderRole: currentRole });
-    }
-
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-
-    clearInterval(callTimerInterval);
-    callSeconds = 0;
-    document.getElementById('callTimer').innerText = '00:00';
-    document.getElementById('callOverlay').classList.remove('active');
-}
-
-// Call Mute Toggle
-function toggleMuteAudio() {
-    if (localStream) {
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            isAudioMuted = !isAudioMuted;
-            audioTrack.enabled = !isAudioMuted;
-            const btnMute = document.getElementById('btnMuteCall');
-            btnMute.classList.toggle('muted', isAudioMuted);
-            btnMute.innerHTML = isAudioMuted ? '<i class="fa-solid fa-microphone-slash"></i>' : '<i class="fa-solid fa-microphone"></i>';
-        }
-    }
-}
-
-// UI Call Overlay Helper
-function openCallOverlay(statusText, isIncoming = false) {
-    document.getElementById('callStatusText').innerText = statusText;
-    document.getElementById('callPeerName').innerText = currentRole === 'user' ? 'IT Specialist Support' : 'User Client';
-    document.getElementById('btnAcceptCall').style.display = isIncoming ? 'inline-flex' : 'none';
-    document.getElementById('callOverlay').classList.add('active');
-}
-
-// Call Timer Interval
-function startCallTimer() {
-    clearInterval(callTimerInterval);
-    callSeconds = 0;
-    callTimerInterval = setInterval(() => {
-        callSeconds++;
-        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-        const secs = String(callSeconds % 60).padStart(2, '0');
-        document.getElementById('callTimer').innerText = `${mins}:${secs}`;
-    }, 1000);
-}
-
-// Web Audio API Ringtone Synthesizer (No External MP3 File needed)
-function startRingtone() {
-    try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ringtoneOscillator) return;
-
-        ringtoneOscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        ringtoneOscillator.type = 'sine';
-        ringtoneOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 Tone
-
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        ringtoneOscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        ringtoneOscillator.start();
     } catch (e) {
-        console.log('Audio Context restricted until user interaction.');
+        console.warn("Database belum disetup, menggunakan Realtime chat mode.");
     }
 }
 
-function stopRingtone() {
-    if (ringtoneOscillator) {
-        try {
-            ringtoneOscillator.stop();
-            ringtoneOscillator.disconnect();
-        } catch (e) {}
-        ringtoneOscillator = null;
+function renderMessage(data) {
+    const isMine = data.clientId === state.clientId || (data.role === state.role && data.clientId === 'db');
+    const div = document.createElement('div');
+    div.className = `message ${isMine ? 'mine' : 'theirs'}`;
+    
+    const roleName = data.role === 'it' ? 'IT Support' : 'User';
+    div.innerHTML = `<div class="msg-sender">${isMine ? 'Anda' : roleName}</div>${data.message}`;
+    
+    dom.messagesContainer.appendChild(div);
+    dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+}
+
+// --- LOGIKA WEB RTC (VOICE CALL) ---
+
+async function setupWebRTC() {
+    state.peerConnection = new RTCPeerConnection(rtcConfig);
+    
+    try {
+        state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        state.localStream.getTracks().forEach(track => {
+            state.peerConnection.addTrack(track, state.localStream);
+        });
+    } catch (error) {
+        console.error("Izin mikrofon ditolak!", error);
+        alert("Izinkan akses mikrofon untuk melakukan panggilan suara.");
+        return false;
     }
+
+    state.peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            channel.send({
+                type: 'broadcast',
+                event: 'ice-candidate',
+                payload: { candidate: event.candidate, targetRole: state.role === 'user' ? 'it' : 'user' }
+            });
+        }
+    };
+
+    state.peerConnection.ontrack = (event) => {
+        dom.remoteAudio.srcObject = event.streams[0];
+    };
+
+    return true;
 }
 
-// Modal Helpers
-function toggleSqlModal() {
-    const modal = document.getElementById('sqlModal');
-    modal.classList.toggle('active');
-}
+async function startCall() {
+    if (state.isCallActive) return;
+    const ready = await setupWebRTC();
+    if (!ready) return;
 
-function copySql() {
-    const sqlText = document.getElementById('sqlCode').innerText;
-    navigator.clipboard.writeText(sqlText).then(() => {
-        alert('SQL Query berhasil disalin!');
+    state.isCallActive = true;
+    showCallModal("Memanggil...", `Ke: ${state.role === 'user' ? 'IT Support' : 'User'}`, true);
+
+    const offer = await state.peerConnection.createOffer();
+    await state.peerConnection.setLocalDescription(offer);
+
+    channel.send({
+        type: 'broadcast',
+        event: 'call-offer',
+        payload: { offer, callerRole: state.role }
     });
+}
+
+async function handleCallOffer(payload) {
+    const { offer, callerRole } = payload.payload;
+    if (callerRole === state.role) return; // Abaikan dari role yang sama
+    
+    state.isCallActive = true;
+    showCallModal("Panggilan Masuk", `Dari: ${callerRole === 'it' ? 'IT Support' : 'User'}`, false);
+    
+    // Simpan offer sementara sampai user menekan Terima
+    state.pendingOffer = offer;
+}
+
+async function acceptCall() {
+    const ready = await setupWebRTC();
+    if (!ready) return;
+
+    dom.acceptCallBtn.style.display = 'none';
+    dom.callStatusText.textContent = "Terhubung dalam panggilan";
+
+    await state.peerConnection.setRemoteDescription(new RTCSessionDescription(state.pendingOffer));
+    const answer = await state.peerConnection.createAnswer();
+    await state.peerConnection.setLocalDescription(answer);
+
+    channel.send({
+        type: 'broadcast',
+        event: 'call-answer',
+        payload: { answer, answererRole: state.role }
+    });
+}
+
+async function handleCallAnswer(payload) {
+    const { answer, answererRole } = payload.payload;
+    if (answererRole === state.role) return;
+    
+    dom.callStatusText.textContent = "Panggilan Terhubung";
+    await state.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+}
+
+async function handleIceCandidate(payload) {
+    const { candidate, targetRole } = payload.payload;
+    if (targetRole !== state.role || !state.peerConnection) return;
+    
+    try {
+        await state.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+        console.error("Gagal menambahkan ICE candidate", e);
+    }
+}
+
+function endCall() {
+    state.isCallActive = false;
+    dom.callModal.classList.remove('active');
+    dom.remoteAudio.srcObject = null;
+    
+    if (state.localStream) {
+        state.localStream.getTracks().forEach(track => track.stop());
+        state.localStream = null;
+    }
+    
+    if (state.peerConnection) {
+        state.peerConnection.close();
+        state.peerConnection = null;
+    }
+
+    channel.send({ type: 'broadcast', event: 'call-ended', payload: {} });
+}
+
+function showCallModal(statusText, roleText, isCaller) {
+    dom.callStatusText.textContent = statusText;
+    dom.callRoleText.textContent = roleText;
+    dom.callModal.classList.add('active');
+    
+    if (isCaller) {
+        dom.acceptCallBtn.style.display = 'none';
+    } else {
+        dom.acceptCallBtn.style.display = 'flex';
+    }
 }
