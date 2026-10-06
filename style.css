@@ -1,178 +1,199 @@
-:root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --bg-color: #f1f5f9;
-  --card-bg: #ffffff;
-  --text-color: #0f172a;
-  --border-color: #cbd5e1;
-  --success: #16a34a;
-  --danger: #dc2626;
-}
-
 * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  padding: 20px;
+    background-color: #f0f2f5;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .app-container {
-  max-width: 850px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+    display: flex;
+    width: 90%;
+    max-width: 1100px;
+    height: 85vh;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    overflow: hidden;
 }
 
-.config-panel {
-  background: var(--card-bg);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+/* Sidebar */
+.sidebar {
+    width: 320px;
+    background: #1e293b;
+    color: #f8fafc;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border-right: 1px solid #334155;
 }
 
-.config-panel h2 {
-  margin-bottom: 12px;
-  color: var(--primary);
+.sidebar h2 {
+    font-size: 1.2rem;
+    color: #38bdf8;
 }
 
-.input-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+.config-group, .role-group, .call-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #0f172a;
+    padding: 12px;
+    border-radius: 8px;
+}
+
+label {
+    font-size: 0.8rem;
+    color: #94a3b8;
 }
 
 input, select, button {
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    font-size: 0.9rem;
+}
+
+input, select {
+    background: #1e293b;
+    color: #fff;
 }
 
 button {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.2s;
+    background: #0284c7;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    border: none;
+    transition: 0.2s;
 }
 
 button:hover:not(:disabled) {
-  background-color: var(--primary-hover);
+    background: #0369a1;
 }
 
 button:disabled {
-  background-color: #cbd5e1;
-  cursor: not-allowed;
+    background: #475569;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
-.btn-success { background-color: var(--success); }
-.btn-danger { background-color: var(--danger); }
+/* Call Control */
+.call-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.call-buttons button {
+    flex: 1;
+    font-size: 0.8rem;
+}
+
+.status-badge {
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    background: #334155;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Chat Main */
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+}
+
+.chat-header {
+    padding: 16px 20px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
 .badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
 }
 
-.badge.disconnected { background: #fee2e2; color: #991b1b; }
-.badge.connected { background: #dcfce7; color: #166534; }
-
-.main-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.card {
-  background: var(--card-bg);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.call-panel {
-  text-align: center;
-}
-
-.call-status {
-  margin: 15px 0;
-  font-size: 15px;
-  font-weight: 500;
-  color: #475569;
-}
-
-.call-controls {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  height: 380px;
-}
+.badge.online { background: #dcfce7; color: #166534; }
+.badge.offline { background: #fee2e2; color: #991b1b; }
 
 .chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  border: 1px solid var(--border-color);
-  padding: 12px;
-  border-radius: 6px;
-  margin: 12px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: #f8fafc;
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.message {
-  max-width: 75%;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 14px;
+.system-message {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.85rem;
+    margin: 10px 0;
 }
 
-.message.sent {
-  align-self: flex-end;
-  background-color: #dbeafe;
-  color: #1e40af;
+.message-bubble {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    word-break: break-word;
 }
 
-.message.received {
-  align-self: flex-start;
-  background-color: #ffffff;
-  border: 1px solid var(--border-color);
+.message-bubble.sent {
+    align-self: flex-end;
+    background: #0284c7;
+    color: white;
+    border-bottom-right-radius: 2px;
 }
 
-.message .sender {
-  font-size: 11px;
-  font-weight: bold;
-  margin-bottom: 3px;
-  color: #64748b;
+.message-bubble.received {
+    align-self: flex-start;
+    background: #e2e8f0;
+    color: #0f172a;
+    border-bottom-left-radius: 2px;
 }
 
-.chat-input-box {
-  display: flex;
-  gap: 10px;
+.sender-info {
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-bottom: 4px;
+    opacity: 0.8;
 }
 
-.chat-input-box input {
-  flex: 1;
+/* Chat Input */
+.chat-input-area {
+    padding: 16px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+}
+
+.chat-input-area button {
+    padding: 8px 20px;
 }

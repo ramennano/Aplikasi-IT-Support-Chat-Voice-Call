@@ -1,59 +1,67 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IT Support & User Communication App</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Supabase JS Client v2 CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Support - Chat & Voice Call</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase JS SDK v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="app-container">
-    <!-- Panel Konfigurasi Supabase & Role -->
-    <header class="config-panel">
-      <h2>IT Desk Support System</h2>
-      <div class="input-group">
-        <input type="text" id="supabaseUrl" placeholder="Supabase URL (https://xyz.supabase.co)">
-        <input type="password" id="supabaseAnonKey" placeholder="Supabase Anon Key">
-        <input type="text" id="roomId" placeholder="ID Ruangan / Tiket" value="room-101">
-        <select id="userRole">
-          <option value="User">User / Client</option>
-          <option value="IT Support">IT Support Specialist</option>
-        </select>
-        <button id="btnConnect" onclick="connectSupabase()">Hubungkan</button>
-      </div>
-      <div id="statusBadge" class="badge disconnected">Status: Terputus</div>
-    </header>
+    <div class="app-container">
+        <!-- Sidebar Konfigurasi & Peran -->
+        <aside class="sidebar">
+            <h2>IT Helpdesk</h2>
+            <div class="config-group">
+                <label>Supabase URL:</label>
+                <input type="text" id="supabaseUrl" placeholder="https://xyz.supabase.co">
+                <label>Supabase Anon Key:</label>
+                <input type="password" id="supabaseKey" placeholder="your-anon-key">
+                <button id="btnConnect" onclick="initSupabase()">Hubungkan Supabase</button>
+            </div>
 
-    <!-- Konten Utama -->
-    <main class="main-content">
-      <!-- Panel Voice Call -->
-      <section class="call-panel card">
-        <h3>Panggilan Suara (Voice Call)</h3>
-        <div class="call-status" id="callStatusText">Siap untuk melakukan panggilan</div>
-        <div class="call-controls">
-          <button id="btnStartCall" onclick="startCall()" disabled>📞 Mulai Panggilan</button>
-          <button id="btnAcceptCall" onclick="acceptCall()" class="btn-success hidden">✅ Angkat Panggilan</button>
-          <button id="btnEndCall" onclick="endCall()" class="btn-danger" disabled>🔴 Akhiri Panggilan</button>
-          <button id="btnToggleMute" onclick="toggleMute()" disabled>🎙️ Mute</button>
-        </div>
-        <!-- Audio player tersembunyi untuk mendengarkan suara lawan -->
-        <audio id="remoteAudio" autoplay></audio>
-      </section>
+            <div class="role-group">
+                <label>Pilih Peran Anda:</label>
+                <select id="roleSelect">
+                    <option value="User">User (Klien)</option>
+                    <option value="IT Support">IT Support</option>
+                </select>
+                <input type="text" id="userNameInput" placeholder="Nama Anda" value="User 1">
+            </div>
 
-      <!-- Panel Chat Realtime -->
-      <section class="chat-panel card">
-        <h3>Pesan Realtime Chat</h3>
-        <div id="chatMessages" class="chat-messages"></div>
-        <div class="chat-input-box">
-          <input type="text" id="chatInput" placeholder="Ketik pesan..." disabled onkeypress="handleKeyPress(event)">
-          <button id="btnSend" onclick="sendMessage()" disabled>Kirim</button>
-        </div>
-      </section>
-    </main>
-  </div>
+            <!-- Area Kontrol Voice Call -->
+            <div class="call-section">
+                <h3>Voice Call</h3>
+                <div id="callStatus" class="status-badge">Terputus</div>
+                <div class="call-buttons">
+                    <button id="btnStartCall" onclick="startCall()">📞 Panggil</button>
+                    <button id="btnEndCall" onclick="endCall()" disabled>🚫 Tutup</button>
+                    <button id="btnMute" onclick="toggleMute()" disabled>🔇 Mute</button>
+                </div>
+                <!-- Audio Element Remote Stream -->
+                <audio id="remoteAudio" autoplay></audio>
+            </div>
+        </aside>
 
-  <script src="app.js"></script>
+        <!-- Area Chat Utama -->
+        <main class="chat-main">
+            <header class="chat-header">
+                <h3 id="chatTitle">Ruang Dukungan IT</h3>
+                <span id="connectionBadge" class="badge offline">Offline</span>
+            </header>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="system-message">Silakan hubungkan Supabase URL & Key untuk memulai.</div>
+            </div>
+
+            <form class="chat-input-area" id="chatForm" onsubmit="sendMessage(event)">
+                <input type="text" id="messageInput" placeholder="Tulis pesan..." autocomplete="off" disabled>
+                <button type="submit" id="btnSend" disabled>Kirim</button>
+            </form>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
